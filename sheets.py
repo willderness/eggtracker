@@ -3,12 +3,19 @@
 import json
 import os
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import gspread
 from google.oauth2.service_account import Credentials
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SHEET_NAME = "EggLog"
+EASTERN_TZ = ZoneInfo("America/New_York")
+
+
+def now_eastern() -> datetime:
+    """Get current datetime in Eastern Time."""
+    return datetime.now(EASTERN_TZ)
 
 
 def get_client() -> gspread.Client:
@@ -41,7 +48,7 @@ def add_eggs(count: int) -> tuple[int, int]:
         Tuple of (today's total, weekly total)
     """
     worksheet = get_worksheet()
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = now_eastern().strftime("%Y-%m-%d")
 
     # Get all records
     records = worksheet.get_all_records()
@@ -72,7 +79,7 @@ def add_eggs(count: int) -> tuple[int, int]:
 def get_today_total() -> int:
     """Get today's egg count."""
     worksheet = get_worksheet()
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = now_eastern().strftime("%Y-%m-%d")
 
     records = worksheet.get_all_records()
     for record in records:
@@ -87,7 +94,7 @@ def get_week_total() -> int:
     worksheet = get_worksheet()
 
     # Calculate date range (last 7 days including today)
-    today = datetime.now()
+    today = now_eastern().date()
     week_ago = today - timedelta(days=6)
 
     records = worksheet.get_all_records()
@@ -97,7 +104,7 @@ def get_week_total() -> int:
         date_str = record.get("Date", "")
         if date_str:
             try:
-                record_date = datetime.strptime(date_str, "%Y-%m-%d")
+                record_date = datetime.strptime(date_str, "%Y-%m-%d").date()
                 if week_ago <= record_date <= today:
                     total += int(record.get("Count", 0))
             except ValueError:
@@ -115,7 +122,7 @@ def get_week_breakdown() -> list[tuple[str, int]]:
     """
     worksheet = get_worksheet()
 
-    today = datetime.now()
+    today = now_eastern().date()
     week_ago = today - timedelta(days=6)
 
     records = worksheet.get_all_records()
@@ -127,7 +134,7 @@ def get_week_breakdown() -> list[tuple[str, int]]:
         date_str = record.get("Date", "")
         if date_str:
             try:
-                record_date = datetime.strptime(date_str, "%Y-%m-%d")
+                record_date = datetime.strptime(date_str, "%Y-%m-%d").date()
                 if week_ago <= record_date <= today:
                     date_counts[date_str] = int(record.get("Count", 0))
             except ValueError:
@@ -135,11 +142,11 @@ def get_week_breakdown() -> list[tuple[str, int]]:
 
     # Fill in all 7 days (including days with 0 eggs)
     for i in range(7):
-        date = today - timedelta(days=i)
-        date_str = date.strftime("%Y-%m-%d")
+        day = today - timedelta(days=i)
+        date_str = day.strftime("%Y-%m-%d")
         count = date_counts.get(date_str, 0)
         # Format as shorter date for display
-        display_date = date.strftime("%a %m/%d")
+        display_date = day.strftime("%a %m/%d")
         breakdown.append((display_date, count))
 
     return breakdown
